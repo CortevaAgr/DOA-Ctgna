@@ -286,7 +286,29 @@ function personCalc(p){
 }
 function show(id,btn){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));if(btn)btn.classList.add('active');if(id==='dashboard')renderDash();if(id==='usuarios')renderUsers();if(id==='cumplimiento')fillPeople();if(id==='catalogo')fillCatalog();if(id==='historial')renderHistory()}
 function esc(x){return (x??'').toString().replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m]))}
-function fillSelect(id,vals,placeholder){let e=document.getElementById(id);if(!e)return;e.innerHTML='<option value="">'+placeholder+'</option>'+[...new Set(vals.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es')).map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}
+
+const DOA_TRANSLATIONS={
+  "EHS&S_ Electrical_All Workers":"EHS&S Electrical — All Workers / EHS&S Eléctrico — Todos los trabajadores",
+  "EHS&S_Electrical Authorized":"EHS&S Electrical — Authorized / EHS&S Eléctrico — Autorizado",
+  "EHS&S_Electrical Qualified":"EHS&S Electrical — Qualified / EHS&S Eléctrico — Calificado",
+  "EHS&S_Electrical Qualified _Process Automation":"EHS&S Electrical — Qualified, Process Automation / EHS&S Eléctrico — Calificado, Automatización de Procesos",
+  "EHS&S_Electrical SME":"EHS&S Electrical — SME / EHS&S Eléctrico — Experto en la materia",
+  "EHS&S_Electrical_General Industry Workers":"EHS&S Electrical — General Industry Workers / EHS&S Eléctrico — Trabajadores de Industria General",
+  "EHS&S_Electrical_Program Leader":"EHS&S Electrical — Program Leader / EHS&S Eléctrico — Líder del Programa",
+  "EHS_Core Permit Issuer":"EHS Core Permit — Permit Issuer / EHS Core Permit — Emisor de Permisos",
+  "EHS_Core Permit Trainer":"EHS Core Permit — Permit Trainer / EHS Core Permit — Entrenador de Permisos",
+  "EHS_Core Permit_ Affected Person":"EHS Core Permit — Affected Person / EHS Core Permit — Persona Afectada",
+  "EHS_Core Permit_ Facility Leader":"EHS Core Permit — Facility Leader / EHS Core Permit — Líder de Instalación",
+  "EHS_Lone Worker":"EHS — Lone Worker / EHS — Trabajador Solitario",
+  "Instructor interno":"Internal Instructor / Instructor Interno",
+  "Operador estibadoras electricas Clase III":"Electric Pallet Truck Operator Class III / Operador de Estibadora Eléctrica Clase III",
+  "Operador montacargas Clase V":"Class V Forklift Operator / Operador de Montacargas Clase V",
+  "Peatones (Pedestrian)":"Pedestrians / Peatones",
+  "Tecnico de Montacargas":"Forklift Technician / Técnico de Montacargas"
+};
+function doaLabel(doa){ return DOA_TRANSLATIONS[doa] || doa; }
+
+function fillSelect(id,vals,placeholder){let e=document.getElementById(id);if(!e)return;e.innerHTML='<option value="">'+placeholder+'</option>'+[...new Set(vals.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es')).map(x=>`<option value="${esc(x)}">${esc(doaLabel(x))}</option>`).join('')}
 function fillQuickSearch(){
  const e=document.getElementById('quickSearch');if(!e)return;
  const people=[...new Set(allPeople().map(x=>x.name).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
@@ -301,7 +323,7 @@ function renderDash(){
  document.getElementById('peopleTable').innerHTML=list.map(p=>`<tr><td><span class="link" onclick='openDetail(${JSON.stringify(p.name)},${JSON.stringify(p.cargo)})'>${p.name}</span></td><td>${p.cargo}</td><td>${p.rows.length}</td><td>${p.percent}%</td><td>${badge(p.auth?'AUTORIZADO':'NO AUTORIZADO')}</td></tr>`).join('');
  document.getElementById('nPeople').textContent=ps.length;document.getElementById('nAuth').textContent=ps.filter(x=>x.auth).length;document.getElementById('nNoAuth').textContent=ps.filter(x=>!x.auth).length;document.getElementById('avg').textContent=Math.round(ps.reduce((a,x)=>a+x.percent,0)/Math.max(1,ps.length))+'%';
 }
-function openDetail(name,cargo){let p=personCalc({name,cargo});document.getElementById('detail').innerHTML=`<div class="panel"><h2>${esc(p.name)}</h2><div class="muted">${esc(p.cargo)}</div><h3>${badge(p.auth?'AUTORIZADO':'NO AUTORIZADO')} &nbsp; ${p.percent}%</h3><div class="grid"><div><h3>DOA</h3>${p.doas.map(x=>`<div class=req>${esc(x)}</div>`).join('')}</div><div><h3>Requisitos</h3>${p.rows.map(r=>`<div class=req><strong>${esc(r.course)}</strong><span class=small>${esc(r.est)} · ${esc(r.doa)}</span><br>${badge(r.status)} ${r.end?'Vence '+fmt(r.end):''}${r.evidence?`<br><span class=history>Soporte registrado</span>`:''}</div>`).join('')}</div></div></div>`}
+function openDetail(name,cargo){let p=personCalc({name,cargo});document.getElementById('detail').innerHTML=`<div class="panel"><h2>${esc(p.name)}</h2><div class="muted">${esc(p.cargo)}</div><h3>${badge(p.auth?'AUTORIZADO':'NO AUTORIZADO')} &nbsp; ${p.percent}%</h3><div class="grid"><div><h3>DOA</h3>${p.doas.map(x=>`<div class=req>${esc(doaLabel(x))}</div>`.join('')}</div><div><h3>Requisitos</h3>${p.rows.map(r=>`<div class=req><strong>${esc(r.course)}</strong><span class=small>${esc(r.est)} · ${esc(doaLabel(r.doa))}</span><br>${badge(r.status)} ${r.end?'Vence '+fmt(r.end):''}${r.evidence?`<br><span class=history>Soporte registrado</span>`:''}</div>`).join('')}</div></div></div>`}
 function openUserDetail(name,cargo){
  const p=personCalc({name,cargo});
  const counts={VIGENTE:0,'POR VENCER':0,VENCIDO:0,PENDIENTE:0};
@@ -320,7 +342,7 @@ function openUserDetail(name,cargo){
    <div class="card"><div class="muted">Pendientes</div><b>${counts.PENDIENTE||0}</b></div>
  </div>
  <div class="grid" style="margin-bottom:16px">
-   <div class="panel" style="box-shadow:none"><h3>DOA aplicables</h3>${p.doas.length?p.doas.map(x=>`<div class=req>${esc(x)}</div>`).join(''):'<span class=muted>Sin DOA configurados.</span>'}</div>
+   <div class="panel" style="box-shadow:none"><h3>DOA aplicables</h3>${p.doas.length?p.doas.map(x=>`<div class=req>${esc(doaLabel(x))}</div>`.join(''):'<span class=muted>Sin DOA configurados.</span>'}</div>
    <div class="panel" style="box-shadow:none"><h3>Estándares aplicables</h3>${standards.length?standards.map(x=>`<div class=req>${esc(x)}</div>`).join(''):'<span class=muted>Sin estándares configurados.</span>'}</div>
  </div>
  <h3>Detalle de cumplimiento</h3>
@@ -332,10 +354,10 @@ function openUserDetail(name,cargo){
 function closeModal(){document.getElementById('modal').classList.remove('open')}
 
 function renderUsers(){document.getElementById('userTable').innerHTML=allPeople().map(p=>{let x=personCalc(p);return `<tr><td><strong>${esc(p.name)}</strong></td><td>${esc(p.cargo)}</td><td>${x.doas.length}</td><td>${badge(x.auth?'AUTORIZADO':'NO AUTORIZADO')}</td><td><button onclick='openUserDetail(${JSON.stringify(p.name)},${JSON.stringify(p.cargo)})'>Ver detalle</button></td></tr>`}).join('')}
-function previewNew(){let c=document.getElementById('newCargo').value, rs=reqs(c);document.getElementById('newReqs').innerHTML=rs.length?rs.map(r=>`<div class=req><strong>${r.course}</strong><span class=small>${r.est} · DOA: ${r.doa} · Frecuencia: ${r.years||Math.round((r.days||0)/365)} años</span></div>`).join(''):'<span class=muted>No hay requisitos configurados para este cargo.</span>';document.getElementById('saveNew').style.display=document.getElementById('newName').value.trim()&&c?'block':'none'}
+function previewNew(){let c=document.getElementById('newCargo').value, rs=reqs(c);document.getElementById('newReqs').innerHTML=rs.length?rs.map(r=>`<div class=req><strong>${r.course}</strong><span class=small>${r.est} · DOA: ${doaLabel(r.doa)} · Frecuencia: ${r.years||Math.round((r.days||0)/365)} años</span></div>`).join(''):'<span class=muted>No hay requisitos configurados para este cargo.</span>';document.getElementById('saveNew').style.display=document.getElementById('newName').value.trim()&&c?'block':'none'}
 function saveUser(){let name=document.getElementById('newName').value.trim(),cargo=document.getElementById('newCargo').value;if(!name||!cargo)return;if(allPeople().some(p=>norm(p.name)===norm(name))){alert('La persona ya existe.');return}customUsers.push({name,cargo,source:'custom',createdAt:new Date().toISOString()});history.push({date:new Date().toISOString(),type:'USUARIO',detail:`Usuario creado: ${name} · ${cargo}`});save();alert('Usuario registrado. Sus requisitos fueron generados automáticamente.');document.getElementById('newName').value='';document.getElementById('saveNew').style.display='none';show('usuarios',document.querySelectorAll('.tab')[1])}
 function fillPeople(){fillSelect('coursePerson',allPeople().map(x=>x.name),'Seleccione un usuario')}
-function loadPersonReqs(){let name=document.getElementById('coursePerson').value,p=allPeople().find(x=>x.name===name);if(!p){document.getElementById('courseForm').innerHTML='';return}let rs=reqs(p.cargo);document.getElementById('courseForm').innerHTML=`<div class=grid3>${rs.map((r,i)=>`<div class=req><strong>${r.course}</strong><span class=small>${r.doa} · ${r.est}</span><div class=field><label>Fecha de realización</label><input type=date id="d${i}"></div><div class=field><label>Soporte del curso</label><input type=file id="f${i}" class=file></div><button onclick='recordCourse(${i},${JSON.stringify(r.course)},${JSON.stringify(r.doa)},${JSON.stringify(p.cargo)},${JSON.stringify(name)})'>Guardar evidencia</button></div>`).join('')}</div>`}
+function loadPersonReqs(){let name=document.getElementById('coursePerson').value,p=allPeople().find(x=>x.name===name);if(!p){document.getElementById('courseForm').innerHTML='';return}let rs=reqs(p.cargo);document.getElementById('courseForm').innerHTML=`<div class=grid3>${rs.map((r,i)=>`<div class=req><strong>${r.course}</strong><span class=small>${doaLabel(r.doa)} · ${r.est}</span><div class=field><label>Fecha de realización</label><input type=date id="d${i}"></div><div class=field><label>Soporte del curso</label><input type=file id="f${i}" class=file></div><button onclick='recordCourse(${i},${JSON.stringify(r.course)},${JSON.stringify(r.doa)},${JSON.stringify(p.cargo)},${JSON.stringify(name)})'>Guardar evidencia</button></div>`).join('')}</div>`}
 function recordCourse(i,course,doa,cargo,name){let d=document.getElementById('d'+i).value,f=document.getElementById('f'+i).files[0];if(!d){alert('Ingresa la fecha de realización.');return}customCourses.push({Nombre:name,Cargo:cargo,DOA:doa,Estándar:reqs(cargo).find(x=>x.course===course&&x.doa===doa)?.est||'',Cursos:course,"Método de entrega":'', "Fecha Realización (mm/dd/aa)":d,"Frecuencia (años)":reqs(cargo).find(x=>x.course===course&&x.doa===doa)?.years||'',Adjunto:f?f.name:'',createdAt:new Date().toISOString()});history.push({date:new Date().toISOString(),type:'CURSO',detail:`Curso registrado: ${course} · ${name} · Fecha ${d} · Soporte ${f?f.name:'No adjunto'}`});save();alert('Registro guardado.');renderDash()}
 function fillCatalog(){let ds=allData().map(x=>x["DOA"]);fillSelect('courseDoa',ds,'Seleccione DOA');fillSelect('updateCourse',allData().map(x=>x["Curso"]),'Seleccione curso')}
 function addDoa(){let s=document.getElementById('stdName').value.trim(),d=document.getElementById('doaName').value.trim();if(!s||!d)return alert('Completa estándar y DOA.');customData.push({Estándar:s,DOA:d,Curso:'', 'Método de entrega':'', 'Course ID':'', 'Frecuencia (años)':0,'Frecuencia (días)':0,version:new Date().toISOString()});history.push({date:new Date().toISOString(),type:'CATÁLOGO',detail:`Nuevo estándar/DOA: ${s} · ${d}`});save();document.getElementById('catalogMsg').innerHTML='<div class=notice>Estándar y DOA agregados. Ahora puedes asociar cursos.</div>';fillCatalog()}
