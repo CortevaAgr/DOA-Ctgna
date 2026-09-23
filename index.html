@@ -201,7 +201,12 @@ tbody tr{transition:.15s}tbody tr:hover{background:#f5fbff}
 
 <section id="dashboard" class="view active">
 <div class="cards"><div class="card"><div class="muted">Personas</div><b id="nPeople">0</b></div><div class="card"><div class="muted">Autorizadas</div><b id="nAuth">0</b></div><div class="card"><div class="muted">No autorizadas</div><b id="nNoAuth">0</b></div><div class="card"><div class="muted">Cumplimiento promedio</div><b id="avg">0%</b></div></div>
-<div class="panel"><h2>Consulta</h2><div class="controls"><input id="q" placeholder="Buscar persona o cargo"><select id="filterStatus"><option value="">Todos</option><option>AUTORIZADO</option><option>NO AUTORIZADO</option></select><select id="filterCargo"><option value="">Todos los cargos</option></select></div>
+<div class="panel"><h2>Consulta</h2><div class="controls">
+<div style="flex:1;min-width:280px"><label for="q">Buscar persona o cargo</label><input id="q" style="width:100%" placeholder="Escribe un nombre o cargo..."></div>
+<div style="min-width:280px"><label for="quickSearch">Selección rápida</label><select id="quickSearch" style="width:100%"><option value="">Selecciona una persona o cargo...</option></select></div>
+<div><label for="filterStatus">Estado</label><select id="filterStatus"><option value="">Todos</option><option>AUTORIZADO</option><option>NO AUTORIZADO</option></select></div>
+<div><label for="filterCargo">Cargo</label><select id="filterCargo"><option value="">Todos los cargos</option></select></div>
+</div>
 <div class="table"><table><thead><tr><th>Persona</th><th>Cargo</th><th>Requisitos</th><th>Cumplimiento</th><th>Estado</th></tr></thead><tbody id="peopleTable"></tbody></table></div></div>
 <div id="detail"></div>
 </section>
@@ -280,16 +285,53 @@ function personCalc(p){
  return {...p,rows,doas:getDoas(p.cargo),percent:rows.length?Math.round(good/rows.length*100):0,auth:rows.length>0&&good===rows.length}
 }
 function show(id,btn){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));if(btn)btn.classList.add('active');if(id==='dashboard')renderDash();if(id==='usuarios')renderUsers();if(id==='cumplimiento')fillPeople();if(id==='catalogo')fillCatalog();if(id==='historial')renderHistory()}
-function fillSelect(id,vals,placeholder){let e=document.getElementById(id);e.innerHTML='<option value="">'+placeholder+'</option>'+[...new Set(vals.filter(Boolean))].sort().map(x=>`<option>${x}</option>`).join('')}
+function esc(x){return (x??'').toString().replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m]))}
+function fillSelect(id,vals,placeholder){let e=document.getElementById(id);if(!e)return;e.innerHTML='<option value="">'+placeholder+'</option>'+[...new Set(vals.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es')).map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}
+function fillQuickSearch(){
+ const e=document.getElementById('quickSearch');if(!e)return;
+ const people=[...new Set(allPeople().map(x=>x.name).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+ const cargos=[...new Set(allPeople().map(x=>x.cargo).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+ e.innerHTML='<option value="">Selecciona una persona o cargo...</option><optgroup label="Personas">'+people.map(x=>`<option value="P:${esc(x)}">${esc(x)}</option>`).join('')+'</optgroup><optgroup label="Cargos / perfiles">'+cargos.map(x=>`<option value="C:${esc(x)}">${esc(x)}</option>`).join('')+'</optgroup>';
+}
 function renderDash(){
  const ps=allPeople().map(personCalc), q=norm(document.getElementById('q')?.value), st=document.getElementById('filterStatus')?.value, ca=norm(document.getElementById('filterCargo')?.value);
  fillSelect('filterCargo',ps.map(x=>x.cargo),'Todos los cargos');
+ fillQuickSearch();
  const list=ps.filter(p=>(!q||norm(p.name).includes(q)||norm(p.cargo).includes(q))&&(!st||(p.auth?'AUTORIZADO':'NO AUTORIZADO')===st)&&(!ca||norm(p.cargo)===ca));
  document.getElementById('peopleTable').innerHTML=list.map(p=>`<tr><td><span class="link" onclick='openDetail(${JSON.stringify(p.name)},${JSON.stringify(p.cargo)})'>${p.name}</span></td><td>${p.cargo}</td><td>${p.rows.length}</td><td>${p.percent}%</td><td>${badge(p.auth?'AUTORIZADO':'NO AUTORIZADO')}</td></tr>`).join('');
  document.getElementById('nPeople').textContent=ps.length;document.getElementById('nAuth').textContent=ps.filter(x=>x.auth).length;document.getElementById('nNoAuth').textContent=ps.filter(x=>!x.auth).length;document.getElementById('avg').textContent=Math.round(ps.reduce((a,x)=>a+x.percent,0)/Math.max(1,ps.length))+'%';
 }
-function openDetail(name,cargo){let p=personCalc({name,cargo});document.getElementById('detail').innerHTML=`<div class="panel"><h2>${p.name}</h2><div class="muted">${p.cargo}</div><h3>${badge(p.auth?'AUTORIZADO':'NO AUTORIZADO')} &nbsp; ${p.percent}%</h3><div class="grid"><div><h3>DOA</h3>${p.doas.map(x=>`<div class=req>${x}</div>`).join('')}</div><div><h3>Requisitos</h3>${p.rows.map(r=>`<div class=req><strong>${r.course}</strong><span class=small>${r.est} · ${r.doa}</span><br>${badge(r.status)} ${r.end?'Vence '+fmt(r.end):''}${r.evidence?`<br><span class=history>Soporte registrado</span>`:''}</div>`).join('')}</div></div></div>`}
-function renderUsers(){document.getElementById('userTable').innerHTML=allPeople().map(p=>{let x=personCalc(p);return `<tr><td>${p.name}</td><td>${p.cargo}</td><td>${x.doas.length}</td><td>${badge(x.auth?'AUTORIZADO':'NO AUTORIZADO')}</td><td><button onclick='openDetail(${JSON.stringify(p.name)},${JSON.stringify(p.cargo)})'>Ver</button></td></tr>`}).join('')}
+function openDetail(name,cargo){let p=personCalc({name,cargo});document.getElementById('detail').innerHTML=`<div class="panel"><h2>${esc(p.name)}</h2><div class="muted">${esc(p.cargo)}</div><h3>${badge(p.auth?'AUTORIZADO':'NO AUTORIZADO')} &nbsp; ${p.percent}%</h3><div class="grid"><div><h3>DOA</h3>${p.doas.map(x=>`<div class=req>${esc(x)}</div>`).join('')}</div><div><h3>Requisitos</h3>${p.rows.map(r=>`<div class=req><strong>${esc(r.course)}</strong><span class=small>${esc(r.est)} · ${esc(r.doa)}</span><br>${badge(r.status)} ${r.end?'Vence '+fmt(r.end):''}${r.evidence?`<br><span class=history>Soporte registrado</span>`:''}</div>`).join('')}</div></div></div>`}
+function openUserDetail(name,cargo){
+ const p=personCalc({name,cargo});
+ const counts={VIGENTE:0,'POR VENCER':0,VENCIDO:0,PENDIENTE:0};
+ p.rows.forEach(r=>counts[r.status]=(counts[r.status]||0)+1);
+ const standards=[...new Set(p.rows.map(r=>r.est).filter(Boolean))];
+ document.getElementById('modalContent').innerHTML=`
+ <div style="display:flex;justify-content:space-between;gap:15px;align-items:flex-start;flex-wrap:wrap">
+   <div><div class="muted">FICHA DEL USUARIO</div><h2 style="margin:5px 0">${esc(p.name)}</h2><div class="muted">Cargo / perfil: <strong>${esc(p.cargo)}</strong></div></div>
+   <div>${badge(p.auth?'AUTORIZADO':'NO AUTORIZADO')} <strong style="font-size:24px;margin-left:8px">${p.percent}%</strong></div>
+ </div>
+ <div class="cards" style="grid-template-columns:repeat(5,1fr);margin-top:18px">
+   <div class="card"><div class="muted">Requisitos</div><b>${p.rows.length}</b></div>
+   <div class="card"><div class="muted">Vigentes</div><b>${counts.VIGENTE||0}</b></div>
+   <div class="card"><div class="muted">Por vencer</div><b>${counts['POR VENCER']||0}</b></div>
+   <div class="card"><div class="muted">Vencidos</div><b>${counts.VENCIDO||0}</b></div>
+   <div class="card"><div class="muted">Pendientes</div><b>${counts.PENDIENTE||0}</b></div>
+ </div>
+ <div class="grid" style="margin-bottom:16px">
+   <div class="panel" style="box-shadow:none"><h3>DOA aplicables</h3>${p.doas.length?p.doas.map(x=>`<div class=req>${esc(x)}</div>`).join(''):'<span class=muted>Sin DOA configurados.</span>'}</div>
+   <div class="panel" style="box-shadow:none"><h3>Estándares aplicables</h3>${standards.length?standards.map(x=>`<div class=req>${esc(x)}</div>`).join(''):'<span class=muted>Sin estándares configurados.</span>'}</div>
+ </div>
+ <h3>Detalle de cumplimiento</h3>
+ <div class="table"><table><thead><tr><th>Estándar</th><th>DOA</th><th>Curso requerido</th><th>Método</th><th>Realización</th><th>Vencimiento</th><th>Estado</th><th>Evidencia</th></tr></thead><tbody>
+ ${p.rows.map(r=>`<tr><td>${esc(r.est)}</td><td>${esc(r.doa)}</td><td><strong>${esc(r.course)}</strong></td><td>${esc(r.method||'—')}</td><td>${r.real?fmt(r.real):'—'}</td><td>${r.end?fmt(r.end):'—'}</td><td>${badge(r.status)}</td><td>${r.evidence?`<span class="history">${esc(r.evidence)}</span>`:'—'}</td></tr>`).join('')}
+ </tbody></table></div>`;
+ document.getElementById('modal').classList.add('open');
+}
+function closeModal(){document.getElementById('modal').classList.remove('open')}
+
+function renderUsers(){document.getElementById('userTable').innerHTML=allPeople().map(p=>{let x=personCalc(p);return `<tr><td><strong>${esc(p.name)}</strong></td><td>${esc(p.cargo)}</td><td>${x.doas.length}</td><td>${badge(x.auth?'AUTORIZADO':'NO AUTORIZADO')}</td><td><button onclick='openUserDetail(${JSON.stringify(p.name)},${JSON.stringify(p.cargo)})'>Ver detalle</button></td></tr>`}).join('')}
 function previewNew(){let c=document.getElementById('newCargo').value, rs=reqs(c);document.getElementById('newReqs').innerHTML=rs.length?rs.map(r=>`<div class=req><strong>${r.course}</strong><span class=small>${r.est} · DOA: ${r.doa} · Frecuencia: ${r.years||Math.round((r.days||0)/365)} años</span></div>`).join(''):'<span class=muted>No hay requisitos configurados para este cargo.</span>';document.getElementById('saveNew').style.display=document.getElementById('newName').value.trim()&&c?'block':'none'}
 function saveUser(){let name=document.getElementById('newName').value.trim(),cargo=document.getElementById('newCargo').value;if(!name||!cargo)return;if(allPeople().some(p=>norm(p.name)===norm(name))){alert('La persona ya existe.');return}customUsers.push({name,cargo,source:'custom',createdAt:new Date().toISOString()});history.push({date:new Date().toISOString(),type:'USUARIO',detail:`Usuario creado: ${name} · ${cargo}`});save();alert('Usuario registrado. Sus requisitos fueron generados automáticamente.');document.getElementById('newName').value='';document.getElementById('saveNew').style.display='none';show('usuarios',document.querySelectorAll('.tab')[1])}
 function fillPeople(){fillSelect('coursePerson',allPeople().map(x=>x.name),'Seleccione un usuario')}
@@ -300,7 +342,20 @@ function addDoa(){let s=document.getElementById('stdName').value.trim(),d=docume
 function addCourseRule(){let d=document.getElementById('courseDoa').value,c=document.getElementById('courseName').value.trim(),y=Number(document.getElementById('courseYears').value),m=document.getElementById('courseMethod').value.trim();if(!d||!c||!y)return alert('Completa DOA, curso y frecuencia.');let base=allData().find(x=>norm(x["DOA"])===norm(d));customData.push({Estándar:base?.["Estándar"]||'',DOA:d,Curso:c,'Método de entrega':m,'Course ID':'','Frecuencia (años)':y,'Frecuencia (días)':y*365,version:new Date().toISOString()});history.push({date:new Date().toISOString(),type:'CATÁLOGO',detail:`Curso agregado: ${c} · DOA ${d} · ${y} años`});save();document.getElementById('catalogMsg').innerHTML='<div class=notice>Curso agregado al requisito. El histórico anterior se conserva.</div>';fillCatalog()}
 function updateRule(){let c=document.getElementById('updateCourse').value,y=Number(document.getElementById('updateYears').value);if(!c||!y)return alert('Selecciona curso y nueva frecuencia.');let matches=allData().filter(x=>norm(x["Curso"])===norm(c));if(!matches.length)return;let old=matches[matches.length-1];customData.push({...old,'Frecuencia (años)':y,'Frecuencia (días)':y*365,version:new Date().toISOString()});history.push({date:new Date().toISOString(),type:'ACTUALIZACIÓN',detail:`Nueva versión de ${c}: frecuencia ${y} años. Versión anterior conservada.`});save();document.getElementById('catalogMsg').innerHTML='<div class=notice>Nueva versión creada. La versión anterior permanece en el histórico.</div>';fillCatalog()}
 function renderHistory(){document.getElementById('historyList').innerHTML=history.length?[...history].reverse().map(h=>`<div class=req><strong>${h.type}</strong>${h.detail}<br><span class=history>${new Date(h.date).toLocaleString('es-CO')}</span></div>`).join(''):'<p class=muted>No hay cambios registrados todavía.</p>'}
-document.getElementById('q').oninput=renderDash;document.getElementById('filterStatus').onchange=renderDash;document.getElementById('filterCargo').onchange=renderDash;
+document.getElementById('q').oninput=renderDash;
+document.getElementById('filterStatus').onchange=renderDash;
+document.getElementById('filterCargo').onchange=renderDash;
+document.getElementById('quickSearch').onchange=function(){
+ const v=this.value;
+ if(!v){document.getElementById('q').value='';renderDash();return;}
+ const type=v.slice(0,2), value=v.slice(2);
+ document.getElementById('q').value=value;
+ if(type==='C:') document.getElementById('filterCargo').value=value;
+ else document.getElementById('filterCargo').value='';
+ renderDash();
+};
+document.getElementById('modal').addEventListener('click',function(e){if(e.target===this)closeModal()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal()});
 fillSelect('newCargo',allPeople().map(x=>x.cargo),'Seleccione cargo/perfil');
 renderDash();
 </script>
