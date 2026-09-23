@@ -217,12 +217,7 @@ tbody tr{transition:.15s}tbody tr:hover{background:#f5fbff}
 </section>
 
 <section id="usuarios" class="view">
-<div class="panel"><h2>Usuarios registrados</h2>
-<div class="controls" style="margin-top:14px">
-  <input id="userSearch" placeholder="Buscar persona o cargo">
-  <select id="userFilterCargo"><option value="">Todos los cargos / perfiles</option></select>
-  <select id="userFilterStatus"><option value="">Todos los estados</option><option>AUTORIZADO</option><option>NO AUTORIZADO</option></select>
-</div><p class="muted">Los nuevos usuarios se agregan al registro y sus requisitos se generan a partir del cargo/perfil seleccionado.</p>
+<div class="panel"><h2>Usuarios registrados</h2><p class="muted">Los nuevos usuarios se agregan al registro y sus requisitos se generan a partir del cargo/perfil seleccionado.</p>
 <div class="table"><table><thead><tr><th>Nombre</th><th>Cargo / perfil</th><th>DOA</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="userTable"></tbody></table></div></div>
 </section>
 
@@ -332,87 +327,14 @@ function fillQuickSearch(){
  e.innerHTML='<option value="">Selecciona una persona o cargo...</option><optgroup label="Personas">'+people.map(x=>`<option value="P:${esc(x)}">${doaLabelHtml(x)}</option>`).join('')+'</optgroup><optgroup label="Cargos / perfiles">'+cargos.map(x=>`<option value="C:${esc(x)}">${doaLabelHtml(x)}</option>`).join('')+'</optgroup>';
 }
 function renderDash(){
- const ps=allPeople().map(personCalc), st=document.getElementById('filterStatus')?.value, ca=norm(document.getElementById('filterCargo')?.value);
+ const ps=allPeople().map(personCalc), q=norm(document.getElementById('q')?.value), st=document.getElementById('filterStatus')?.value, ca=norm(document.getElementById('filterCargo')?.value);
  fillSelect('filterCargo',ps.map(x=>x.cargo),'Todos los cargos');
  fillQuickSearch();
- const list=ps.filter(p=>(!st||(p.auth?'AUTORIZADO':'NO AUTORIZADO')===st)&&(!ca||norm(p.cargo)===ca));
+ const list=ps.filter(p=>(!q||norm(p.name).includes(q)||norm(p.cargo).includes(q))&&(!st||(p.auth?'AUTORIZADO':'NO AUTORIZADO')===st)&&(!ca||norm(p.cargo)===ca));
  document.getElementById('peopleTable').innerHTML=list.map(p=>`<tr><td><span class="link" onclick='openDetail(${JSON.stringify(p.name)},${JSON.stringify(p.cargo)})'>${p.name}</span></td><td>${p.cargo}</td><td>${p.rows.length}</td><td>${p.percent}%</td><td>${badge(p.auth?'AUTORIZADO':'NO AUTORIZADO')}</td></tr>`).join('');
  document.getElementById('nPeople').textContent=ps.length;document.getElementById('nAuth').textContent=ps.filter(x=>x.auth).length;document.getElementById('nNoAuth').textContent=ps.filter(x=>!x.auth).length;document.getElementById('avg').textContent=Math.round(ps.reduce((a,x)=>a+x.percent,0)/Math.max(1,ps.length))+'%';
 }
-function openDetail(name,cargo){
- const p=personCalc({name,cargo});
- const counts={
-   vigente:p.rows.filter(r=>r.status==='VIGENTE').length,
-   porVencer:p.rows.filter(r=>r.status==='POR VENCER').length,
-   vencido:p.rows.filter(r=>r.status==='VENCIDO').length,
-   pendiente:p.rows.filter(r=>r.status==='PENDIENTE').length
- };
- const reqHtml=p.rows.length ? p.rows.map(r=>`
-   <div class="req">
-     <strong>${escapeHtml(r.course || 'Curso no definido')}</strong>
-     <span class="small">${escapeHtml(r.est || '')} · ${escapeHtml(r.doa || '')}</span><br>
-     ${badge(r.status)}
-     ${r.real ? `<span class="small"> Realización: ${fmt(r.real)}</span>` : ''}
-     ${r.end ? `<span class="small"> · Vence: ${fmt(r.end)}</span>` : ''}
-     ${r.evidence ? `<br><span class="history">Soporte: ${escapeHtml(r.evidence)}</span>` : ''}
-   </div>`).join('') :
-   '<div class="notice">No hay requisitos configurados para este cargo/perfil.</div>';
-
- const content=`
-   <div style="display:flex;justify-content:space-between;gap:15px;align-items:flex-start">
-     <div>
-       <h2 style="margin:0 0 5px">${escapeHtml(p.name)}</h2>
-       <div class="muted">${escapeHtml(p.cargo || '')}</div>
-     </div>
-     <div>${badge(p.auth?'AUTORIZADO':'NO AUTORIZADO')}</div>
-   </div>
-
-   <div class="cards" style="grid-template-columns:repeat(4,1fr);margin-top:18px">
-     <div class="card"><div class="muted">Cumplimiento</div><b>${p.percent}%</b></div>
-     <div class="card"><div class="muted">Vigentes</div><b>${counts.vigente}</b></div>
-     <div class="card"><div class="muted">Por vencer</div><b>${counts.porVencer}</b></div>
-     <div class="card"><div class="muted">Pendientes / vencidos</div><b>${counts.pendiente+counts.vencido}</b></div>
-   </div>
-
-   <div class="grid">
-     <div>
-       <h3>Información del usuario</h3>
-       <div class="req"><strong>Cargo / Perfil</strong>${escapeHtml(p.cargo || '—')}</div>
-       <div class="req"><strong>DOA aplicables</strong>
-         ${p.doas.length ? p.doas.map(d=>`<div>${escapeHtml(d)}</div>`).join('') : '—'}
-       </div>
-       <div class="req"><strong>Estándares aplicables</strong>
-         ${[...new Set(p.rows.map(r=>r.est).filter(Boolean))].length ?
-           [...new Set(p.rows.map(r=>r.est).filter(Boolean))].map(e=>`<div>${escapeHtml(e)}</div>`).join('') : '—'}
-       </div>
-     </div>
-     <div>
-       <h3>Detalle de requisitos</h3>
-       ${reqHtml}
-     </div>
-   </div>`;
-
- const modal=document.getElementById('modal');
- const modalContent=document.getElementById('modalContent');
- if(modal && modalContent){
-   modalContent.innerHTML=content;
-   modal.classList.add('open');
- }else{
-   const detail=document.getElementById('detail');
-   if(detail) detail.innerHTML=`<div class="panel">${content}</div>`;
- }
-}
-
-function closeModal(){
- const modal=document.getElementById('modal');
- if(modal) modal.classList.remove('open');
-}
-
-function escapeHtml(value){
- return String(value ?? '').replace(/[&<>"']/g,function(ch){
-   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
- });
-}
+function openDetail(name,cargo){let p=personCalc({name,cargo});document.getElementById('detail').innerHTML=`<div class="panel"><h2>${esc(p.name)}</h2><div class="muted">${esc(p.cargo)}</div><h3>${badge(p.auth?'AUTORIZADO':'NO AUTORIZADO')} &nbsp; ${p.percent}%</h3><div class="grid"><div><h3>DOA</h3>${p.doas.map(x=>`<div class=req>${doaLabelHtml(x)}</div>`).join('')}</div><div><h3>Requisitos</h3>${p.rows.map(r=>`<div class=req><strong>${esc(r.course)}</strong><span class=small>${esc(r.est)} · ${doaLabelHtml(r.doa)}</span><br>${badge(r.status)} ${r.end?'Vence '+fmt(r.end):''}${r.evidence?`<br><span class=history>Soporte registrado</span>`:''}</div>`).join('')}</div></div></div>`}
 function openUserDetail(name,cargo){
  const p=personCalc({name,cargo});
  const counts={VIGENTE:0,'POR VENCER':0,VENCIDO:0,PENDIENTE:0};
@@ -442,33 +364,32 @@ function openUserDetail(name,cargo){
 }
 function closeModal(){document.getElementById('modal').classList.remove('open')}
 
-function renderUsers(){
- const ps=allPeople().map(personCalc);
- const q=norm(document.getElementById('userSearch')?.value);
- const cargo=norm(document.getElementById('userFilterCargo')?.value);
- const status=document.getElementById('userFilterStatus')?.value;
- const filtered=ps.filter(p=>
-   (!q||norm(p.name).includes(q)||norm(p.cargo).includes(q)) &&
-   (!cargo||norm(p.cargo)===cargo) &&
-   (!status||(p.auth?'AUTORIZADO':'NO AUTORIZADO')===status)
- );
- fillSelect('userFilterCargo',ps.map(x=>x.cargo),'Todos los cargos / perfiles');
- const selectedCargo=document.getElementById('userFilterCargo');
- if(selectedCargo && cargo) selectedCargo.value=[...selectedCargo.options].find(o=>norm(o.value)===cargo)?.value||'';
- document.getElementById('userTable').innerHTML=filtered.map(p=>{
-   let x=personCalc(p);
-   return `<tr><td>${p.name}</td><td>${p.cargo}</td><td>${x.doas.length}</td><td>${badge(x.auth?'AUTORIZADO':'NO AUTORIZADO')}</td><td><button onclick='openDetail(${JSON.stringify(p.name)},${JSON.stringify(p.cargo)})'>Ver detalle</button></td></tr>`;
- }).join('');
+function renderUsers(){document.getElementById('userTable').innerHTML=allPeople().map(p=>{let x=personCalc(p);return `<tr><td><strong>${esc(p.name)}</strong></td><td>${esc(p.cargo)}</td><td>${x.doas.length}</td><td>${badge(x.auth?'AUTORIZADO':'NO AUTORIZADO')}</td><td><button onclick='openUserDetail(${JSON.stringify(p.name)},${JSON.stringify(p.cargo)})'>Ver detalle</button></td></tr>`}).join('')}
+function previewNew(){let c=document.getElementById('newCargo').value, rs=reqs(c);document.getElementById('newReqs').innerHTML=rs.length?rs.map(r=>`<div class=req><strong>${r.course}</strong><span class=small>${r.est} · DOA: ${doaLabelHtml(r.doa)} · Frecuencia: ${r.years||Math.round((r.days||0)/365)} años</span></div>`).join(''):'<span class=muted>No hay requisitos configurados para este cargo.</span>';document.getElementById('saveNew').style.display=document.getElementById('newName').value.trim()&&c?'block':'none'}
+function saveUser(){let name=document.getElementById('newName').value.trim(),cargo=document.getElementById('newCargo').value;if(!name||!cargo)return;if(allPeople().some(p=>norm(p.name)===norm(name))){alert('La persona ya existe.');return}customUsers.push({name,cargo,source:'custom',createdAt:new Date().toISOString()});history.push({date:new Date().toISOString(),type:'USUARIO',detail:`Usuario creado: ${name} · ${cargo}`});save();alert('Usuario registrado. Sus requisitos fueron generados automáticamente.');document.getElementById('newName').value='';document.getElementById('saveNew').style.display='none';show('usuarios',document.querySelectorAll('.tab')[1])}
+function fillPeople(){fillSelect('coursePerson',allPeople().map(x=>x.name),'Seleccione un usuario')}
+function loadPersonReqs(){let name=document.getElementById('coursePerson').value,p=allPeople().find(x=>x.name===name);if(!p){document.getElementById('courseForm').innerHTML='';return}let rs=reqs(p.cargo);document.getElementById('courseForm').innerHTML=`<div class=grid3>${rs.map((r,i)=>`<div class=req><strong>${r.course}</strong><span class=small>${r.doa} · ${r.est}</span><div class=field><label>Fecha de realización</label><input type=date id="d${i}"></div><div class=field><label>Soporte del curso</label><input type=file id="f${i}" class=file></div><button onclick='recordCourse(${i},${JSON.stringify(r.course)},${JSON.stringify(r.doa)},${JSON.stringify(p.cargo)},${JSON.stringify(name)})'>Guardar evidencia</button></div>`).join('')}</div>`}
+function recordCourse(i,course,doa,cargo,name){let d=document.getElementById('d'+i).value,f=document.getElementById('f'+i).files[0];if(!d){alert('Ingresa la fecha de realización.');return}customCourses.push({Nombre:name,Cargo:cargo,DOA:doa,Estándar:reqs(cargo).find(x=>x.course===course&&x.doa===doa)?.est||'',Cursos:course,"Método de entrega":'', "Fecha Realización (mm/dd/aa)":d,"Frecuencia (años)":reqs(cargo).find(x=>x.course===course&&x.doa===doa)?.years||'',Adjunto:f?f.name:'',createdAt:new Date().toISOString()});history.push({date:new Date().toISOString(),type:'CURSO',detail:`Curso registrado: ${course} · ${name} · Fecha ${d} · Soporte ${f?f.name:'No adjunto'}`});save();alert('Registro guardado.');renderDash()}
+function fillCatalog(){let ds=allData().map(x=>x["DOA"]);fillSelect('courseDoa',ds,'Seleccione DOA');fillSelect('updateCourse',allData().map(x=>x["Curso"]),'Seleccione curso')}
+function addDoa(){let s=document.getElementById('stdName').value.trim(),d=document.getElementById('doaName').value.trim();if(!s||!d)return alert('Completa estándar y DOA.');customData.push({Estándar:s,DOA:d,Curso:'', 'Método de entrega':'', 'Course ID':'', 'Frecuencia (años)':0,'Frecuencia (días)':0,version:new Date().toISOString()});history.push({date:new Date().toISOString(),type:'CATÁLOGO',detail:`Nuevo estándar/DOA: ${s} · ${d}`});save();document.getElementById('catalogMsg').innerHTML='<div class=notice>Estándar y DOA agregados. Ahora puedes asociar cursos.</div>';fillCatalog()}
+function addCourseRule(){let d=document.getElementById('courseDoa').value,c=document.getElementById('courseName').value.trim(),y=Number(document.getElementById('courseYears').value),m=document.getElementById('courseMethod').value.trim();if(!d||!c||!y)return alert('Completa DOA, curso y frecuencia.');let base=allData().find(x=>norm(x["DOA"])===norm(d));customData.push({Estándar:base?.["Estándar"]||'',DOA:d,Curso:c,'Método de entrega':m,'Course ID':'','Frecuencia (años)':y,'Frecuencia (días)':y*365,version:new Date().toISOString()});history.push({date:new Date().toISOString(),type:'CATÁLOGO',detail:`Curso agregado: ${c} · DOA ${d} · ${y} años`});save();document.getElementById('catalogMsg').innerHTML='<div class=notice>Curso agregado al requisito. El histórico anterior se conserva.</div>';fillCatalog()}
+function updateRule(){let c=document.getElementById('updateCourse').value,y=Number(document.getElementById('updateYears').value);if(!c||!y)return alert('Selecciona curso y nueva frecuencia.');let matches=allData().filter(x=>norm(x["Curso"])===norm(c));if(!matches.length)return;let old=matches[matches.length-1];customData.push({...old,'Frecuencia (años)':y,'Frecuencia (días)':y*365,version:new Date().toISOString()});history.push({date:new Date().toISOString(),type:'ACTUALIZACIÓN',detail:`Nueva versión de ${c}: frecuencia ${y} años. Versión anterior conservada.`});save();document.getElementById('catalogMsg').innerHTML='<div class=notice>Nueva versión creada. La versión anterior permanece en el histórico.</div>';fillCatalog()}
+function renderHistory(){document.getElementById('historyList').innerHTML=history.length?[...history].reverse().map(h=>`<div class=req><strong>${h.type}</strong>${h.detail}<br><span class=history>${new Date(h.date).toLocaleString('es-CO')}</span></div>`).join(''):'<p class=muted>No hay cambios registrados todavía.</p>'}
+document.getElementById('q').oninput=renderDash;
+document.getElementById('filterStatus').onchange=renderDash;
+document.getElementById('filterCargo').onchange=renderDash;
+document.getElementById('quickSearch').onchange=function(){
+ const v=this.value;
+ if(!v){document.getElementById('q').value='';renderDash();return;}
+ const type=v.slice(0,2), value=v.slice(2);
+ document.getElementById('q').value=value;
+ if(type==='C:') document.getElementById('filterCargo').value=value;
+ else document.getElementById('filterCargo').value='';
+ renderDash();
 };
 document.getElementById('modal').addEventListener('click',function(e){if(e.target===this)closeModal()});
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal()});
 fillSelect('newCargo',allPeople().map(x=>x.cargo),'Seleccione cargo/perfil');
-const modalEl=document.getElementById('modal');
-if(modalEl){
- modalEl.addEventListener('click',function(e){if(e.target===modalEl)closeModal();});
-}
-document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
-
 renderDash();
 </script>
 
