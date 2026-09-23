@@ -339,7 +339,80 @@ function renderDash(){
  document.getElementById('peopleTable').innerHTML=list.map(p=>`<tr><td><span class="link" onclick='openDetail(${JSON.stringify(p.name)},${JSON.stringify(p.cargo)})'>${p.name}</span></td><td>${p.cargo}</td><td>${p.rows.length}</td><td>${p.percent}%</td><td>${badge(p.auth?'AUTORIZADO':'NO AUTORIZADO')}</td></tr>`).join('');
  document.getElementById('nPeople').textContent=ps.length;document.getElementById('nAuth').textContent=ps.filter(x=>x.auth).length;document.getElementById('nNoAuth').textContent=ps.filter(x=>!x.auth).length;document.getElementById('avg').textContent=Math.round(ps.reduce((a,x)=>a+x.percent,0)/Math.max(1,ps.length))+'%';
 }
-function openDetail(name,cargo){let p=personCalc({name,cargo});document.getElementById('detail').innerHTML=`<div class="panel"><h2>${esc(p.name)}</h2><div class="muted">${esc(p.cargo)}</div><h3>${badge(p.auth?'AUTORIZADO':'NO AUTORIZADO')} &nbsp; ${p.percent}%</h3><div class="grid"><div><h3>DOA</h3>${p.doas.map(x=>`<div class=req>${doaLabelHtml(x)}</div>`).join('')}</div><div><h3>Requisitos</h3>${p.rows.map(r=>`<div class=req><strong>${esc(r.course)}</strong><span class=small>${esc(r.est)} · ${doaLabelHtml(r.doa)}</span><br>${badge(r.status)} ${r.end?'Vence '+fmt(r.end):''}${r.evidence?`<br><span class=history>Soporte registrado</span>`:''}</div>`).join('')}</div></div></div>`}
+function openDetail(name,cargo){
+ const p=personCalc({name,cargo});
+ const counts={
+   vigente:p.rows.filter(r=>r.status==='VIGENTE').length,
+   porVencer:p.rows.filter(r=>r.status==='POR VENCER').length,
+   vencido:p.rows.filter(r=>r.status==='VENCIDO').length,
+   pendiente:p.rows.filter(r=>r.status==='PENDIENTE').length
+ };
+ const reqHtml=p.rows.length ? p.rows.map(r=>`
+   <div class="req">
+     <strong>${escapeHtml(r.course || 'Curso no definido')}</strong>
+     <span class="small">${escapeHtml(r.est || '')} · ${escapeHtml(r.doa || '')}</span><br>
+     ${badge(r.status)}
+     ${r.real ? `<span class="small"> Realización: ${fmt(r.real)}</span>` : ''}
+     ${r.end ? `<span class="small"> · Vence: ${fmt(r.end)}</span>` : ''}
+     ${r.evidence ? `<br><span class="history">Soporte: ${escapeHtml(r.evidence)}</span>` : ''}
+   </div>`).join('') :
+   '<div class="notice">No hay requisitos configurados para este cargo/perfil.</div>';
+
+ const content=`
+   <div style="display:flex;justify-content:space-between;gap:15px;align-items:flex-start">
+     <div>
+       <h2 style="margin:0 0 5px">${escapeHtml(p.name)}</h2>
+       <div class="muted">${escapeHtml(p.cargo || '')}</div>
+     </div>
+     <div>${badge(p.auth?'AUTORIZADO':'NO AUTORIZADO')}</div>
+   </div>
+
+   <div class="cards" style="grid-template-columns:repeat(4,1fr);margin-top:18px">
+     <div class="card"><div class="muted">Cumplimiento</div><b>${p.percent}%</b></div>
+     <div class="card"><div class="muted">Vigentes</div><b>${counts.vigente}</b></div>
+     <div class="card"><div class="muted">Por vencer</div><b>${counts.porVencer}</b></div>
+     <div class="card"><div class="muted">Pendientes / vencidos</div><b>${counts.pendiente+counts.vencido}</b></div>
+   </div>
+
+   <div class="grid">
+     <div>
+       <h3>Información del usuario</h3>
+       <div class="req"><strong>Cargo / Perfil</strong>${escapeHtml(p.cargo || '—')}</div>
+       <div class="req"><strong>DOA aplicables</strong>
+         ${p.doas.length ? p.doas.map(d=>`<div>${escapeHtml(d)}</div>`).join('') : '—'}
+       </div>
+       <div class="req"><strong>Estándares aplicables</strong>
+         ${[...new Set(p.rows.map(r=>r.est).filter(Boolean))].length ?
+           [...new Set(p.rows.map(r=>r.est).filter(Boolean))].map(e=>`<div>${escapeHtml(e)}</div>`).join('') : '—'}
+       </div>
+     </div>
+     <div>
+       <h3>Detalle de requisitos</h3>
+       ${reqHtml}
+     </div>
+   </div>`;
+
+ const modal=document.getElementById('modal');
+ const modalContent=document.getElementById('modalContent');
+ if(modal && modalContent){
+   modalContent.innerHTML=content;
+   modal.classList.add('open');
+ }else{
+   const detail=document.getElementById('detail');
+   if(detail) detail.innerHTML=`<div class="panel">${content}</div>`;
+ }
+}
+
+function closeModal(){
+ const modal=document.getElementById('modal');
+ if(modal) modal.classList.remove('open');
+}
+
+function escapeHtml(value){
+ return String(value ?? '').replace(/[&<>"']/g,function(ch){
+   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
+ });
+}
 function openUserDetail(name,cargo){
  const p=personCalc({name,cargo});
  const counts={VIGENTE:0,'POR VENCER':0,VENCIDO:0,PENDIENTE:0};
@@ -390,6 +463,12 @@ function renderUsers(){
 document.getElementById('modal').addEventListener('click',function(e){if(e.target===this)closeModal()});
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal()});
 fillSelect('newCargo',allPeople().map(x=>x.cargo),'Seleccione cargo/perfil');
+const modalEl=document.getElementById('modal');
+if(modalEl){
+ modalEl.addEventListener('click',function(e){if(e.target===modalEl)closeModal();});
+}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
+
 renderDash();
 </script>
 
